@@ -1,0 +1,75 @@
+import cv2
+import socketio
+from ultralytics import YOLO
+import time
+from datetime import datetime
+
+# Configura RTSP
+RTSP_URL = 'rtsp://usuario:contraseña@IP_DVR:554/stream1'
+
+# Cargar el modelo YOLOv8
+model = YOLO("yolov8n.pt")  # Cambia a yolov8s.pt o yolov8m.pt si tienes GPU
+
+# Conexión WebSocket al frontend Next.js
+sio = socketio.Client()
+
+try:
+    sio.connect(
+        'http://localhost:3000',
+        transports=['websocket'],
+        socketio_path='/api/socket'  # IMPORTANTE: debe coincidir con el path en tu servidor Next.js
+    )
+    print("Conectado a Socket.IO")
+except Exception as e:
+    print("Error conectando a Socket.IO:", e)
+    exit(1)
+
+cap = cv2.VideoCapture(RTSP_URL)
+
+if not cap.isOpened():
+    print("No se pudo abrir el stream RTSP")
+    exit(1)
+
+last_sent = 0
+interval = 1.0  # segundos entre envíos para evitar spam
+
+try:
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("No se recibió frame, intentando reconectar...")
+            cap.release()
+            time.sleep(1)
+            cap = cv2.VideoCapture(RTSP_URL)
+            continue
+
+        results = model.predict(frame, conf=0.5)
+
+        for result in results:
+            boxes = result.boxes
+            for box in boxes:
+                cls_id = int(box.cls[0])
+                cls_name = model.names[cls_id]
+                conf = float(box.conf[0])
+
+                if cls_name == 'person':
+                    now = time.time()
+                    if now - last_sent > interval:
+                        sio.emit('deteccion', {
+                            'tipo': cls_name,
+                            'confianza': round(conf, 2),
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        print(f"Persona detectada ({conf:.2f}) enviada al servidor")
+                        last_sent = now
+
+        # Pequeña pausa para no saturar la CPU
+        time.sleep(0.1)
+
+except KeyboardInterrupt:
+    print("Detención manual por teclado")
+
+finally:
+    cap.release()
+    sio.disconnect()
+    print("Recursos liberados y desconectado de Socket.IO")
