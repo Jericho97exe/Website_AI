@@ -22,3 +22,4 @@ npm install @radix-ui/react-popover
 npm install @radix-ui/react-scroll-area
 npm install @radix-ui/react-tabs
 npm install framer-motion
+npm install socket.io-client
