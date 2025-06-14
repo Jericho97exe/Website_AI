@@ -1,0 +1,63 @@
+# ====================
+# Python - backend
+# ====================
+
+# Entornos virtuales
+backend/yolov8_env/
+backend/__pycache__/
+backend/*.py[cod]
+backend/*.so
+backend/*.egg-info/
+backend/dist/
+backend/build/
+
+# Archivos de configuración y logs
+backend/.env
+backend/*.log
+
+# Pytest cache
+backend/.pytest_cache/
+
+# mypy
+backend/.mypy_cache/
+
+# Cython debug symbols
+backend/cython_debug/
+
+# ====================
+# Node / Next.js - zero
+# ====================
+
+# Node modules
+zero/node_modules/
+
+# Next.js build output
+zero/.next/
+zero/out/
+
+# Local env files
+zero/.env
+zero/.env.local
+zero/.env.development.local
+zero/.env.test.local
+zero/.env.production.local
+
+# npm logs
+zero/npm-debug.log*
+zero/yarn-debug.log*
+zero/yarn-error.log*
+
+# Editor directories and files
+.zero/.idea/
+zero/.vscode/
+zero/*.suo
+zero/*.ntvs*
+zero/*.njsproj
+zero/*.sln
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
