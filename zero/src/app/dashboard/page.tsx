@@ -50,11 +50,11 @@ export default function Dashboard() {
         <Link href="/dashboard/background">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Página con Fondo</CardTitle>
+              <CardTitle className="text-lg font-medium">Deteccion de Personas WEBCAM</CardTitle>
               <ImageIcon className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <CardDescription>Visualiza una página con imagen de fondo.</CardDescription>
+              <CardDescription>Analiza el video en tiempo real de una WEBCAM e identifica personas.</CardDescription>
             </CardContent>
           </Card>
         </Link>

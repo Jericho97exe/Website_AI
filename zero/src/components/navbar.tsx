@@ -23,7 +23,7 @@ export function Navbar() {
     { name: "Notificaciones", href: "/dashboard/notifications" },
     { name: "Imágenes", href: "/dashboard/images" },
     { name: "Conexión DVR", href: "/dashboard/dvr" },
-    { name: "Página con Fondo", href: "/dashboard/background" },
+    { name: "WebCam", href: "/dashboard/background" },
   ]
 
   if (user?.role === "admin") {

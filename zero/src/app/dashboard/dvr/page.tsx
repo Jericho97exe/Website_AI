@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,29 +10,81 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Save } from "lucide-react"
 import { useNotifications } from "@/components/notification-provider"
 
-// Simple encryption function (for demo purposes only)
-// In a real app, use a proper encryption library
+type DvrConnection = {
+  id: string
+  name: string
+  ipAddress: string
+  port: string
+  username: string
+  password: string
+  timestamp: number
+}
+
+// Función de cifrado simple (solo para demostración)
 const encryptData = (text: string, key: string): string => {
-  // Simple XOR encryption (NOT secure for production)
   let result = ""
   for (let i = 0; i < text.length; i++) {
     const charCode = text.charCodeAt(i) ^ key.charCodeAt(i % key.length)
     result += String.fromCharCode(charCode)
   }
-  return btoa(result) // Base64 encode
+  return btoa(result)
 }
 
 export default function DvrPage() {
   const router = useRouter()
-  const [ipAddress, setIpAddress] = useState("")
-  const [port, setPort] = useState("")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
+  const { addNotification } = useNotifications()
+  const [formData, setFormData] = useState({
+    ipAddress: "",
+    port: "554",
+    username: "admin",
+    password: "",
+    name: ""
+  })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
-  const { addNotification } = useNotifications()
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+  const [testing, setTesting] = useState(false)
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData(prev => ({ ...prev, [id]: value }))
+  }
+
+  // Probar conexión al DVR
+  const testConnection = async () => {
+    if (!formData.ipAddress || !formData.port) {
+      setError("Dirección IP y puerto son obligatorios para probar la conexión")
+      return
+    }
+
+    try {
+      setTesting(true)
+      setTestResult(null)
+      
+      // URL de prueba para snapshot del canal 1
+      const testUrl = `http://${formData.ipAddress}:${formData.port}/cgi-bin/snapshot.cgi?channel=1`
+      
+      const response = await fetch(testUrl, {
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${formData.username}:${formData.password}`)
+        }
+      })
+
+      if (response.ok && response.headers.get('content-type')?.includes('image/jpeg')) {
+        setTestResult("success")
+        addNotification("Conexión exitosa", "Se ha conectado correctamente al DVR", "success")
+      } else {
+        setTestResult("error")
+        addNotification("Error de conexión", "No se pudo conectar al DVR", "error")
+      }
+    } catch (error) {
+      setTestResult("error")
+      addNotification("Error de conexión", "Ocurrió un error al intentar conectar al DVR", "error")
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,59 +93,54 @@ export default function DvrPage() {
     setLoading(true)
 
     try {
-      // Validate inputs
-      if (!ipAddress || !port || !username || !password || !name) {
+      // Validar entradas
+      if (!formData.ipAddress || !formData.port || !formData.username || !formData.name) {
         setError("Todos los campos son obligatorios")
         setLoading(false)
         return
       }
 
-      // Validate IP address format
+      // Validar formato de IP
       const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
-      if (!ipRegex.test(ipAddress)) {
+      if (!ipRegex.test(formData.ipAddress)) {
         setError("Formato de dirección IP inválido")
         setLoading(false)
         return
       }
 
-      // Validate port number
-      const portNum = Number.parseInt(port)
+      // Validar puerto
+      const portNum = Number.parseInt(formData.port)
       if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
         setError("El puerto debe ser un número entre 1 y 65535")
         setLoading(false)
         return
       }
 
-      // Encrypt sensitive data
-      const encryptionKey = "secureKey123" // In a real app, use a proper key management system
-      const encryptedPassword = encryptData(password, encryptionKey)
+      // Cifrar contraseña
+      const encryptionKey = "secureKey123"
+      const encryptedPassword = encryptData(formData.password, encryptionKey)
 
-      // Get existing DVRs or initialize empty array
-      const existingDvrs = JSON.parse(localStorage.getItem("dvrConnections") || "[]")
-
-      // Create new DVR connection data
-      const connectionData = {
+      // Crear nuevo DVR
+      const connectionData: DvrConnection = {
         id: Date.now().toString(),
-        name,
-        ipAddress,
-        port,
-        username,
-        password: encryptedPassword, // Store encrypted password
+        name: formData.name,
+        ipAddress: formData.ipAddress,
+        port: formData.port,
+        username: formData.username,
+        password: encryptedPassword,
         timestamp: Date.now(),
       }
 
-      // Add to array and store
+      // Obtener DVRs existentes o inicializar array vacío
+      const existingDvrs = JSON.parse(localStorage.getItem("dvrConnections") || "[]")
       existingDvrs.push(connectionData)
       localStorage.setItem("dvrConnections", JSON.stringify(existingDvrs))
 
-      // Añadir notificación
-      addNotification("Configuración DVR guardada", `El DVR "${name}" se ha configurado correctamente`, "success")
+      // Notificación de éxito
+      addNotification("Configuración DVR guardada", `El DVR "${formData.name}" se ha configurado correctamente`, "success")
 
-      // Simulate API call delay and redirect
+      // Redirigir después de 1 segundo
       setTimeout(() => {
-        setSuccess("Configuración de DVR guardada correctamente")
-        setLoading(false)
-        // Redirect to the manage page
         router.push("/dashboard/dvr/manage")
       }, 1000)
     } catch (err) {
@@ -120,34 +165,79 @@ export default function DvrPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre del DVR</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="DVR Principal" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ipAddress">Dirección IP</Label>
-              <Input
-                id="ipAddress"
-                value={ipAddress}
-                onChange={(e) => setIpAddress(e.target.value)}
-                placeholder="192.168.1.100"
+              <Label htmlFor="name">Nombre del DVR *</Label>
+              <Input 
+                id="name" 
+                value={formData.name} 
+                onChange={handleChange} 
+                placeholder="DVR Principal" 
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="port">Puerto</Label>
-              <Input id="port" value={port} onChange={(e) => setPort(e.target.value)} placeholder="8080" />
+              <Label htmlFor="ipAddress">Dirección IP *</Label>
+              <Input
+                id="ipAddress"
+                value={formData.ipAddress}
+                onChange={handleChange}
+                placeholder="192.168.1.100"
+                required
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="username">Nombre de usuario</Label>
-              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+              <Label htmlFor="port">Puerto *</Label>
+              <Input 
+                id="port" 
+                value={formData.port} 
+                onChange={handleChange} 
+                placeholder="554" 
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Nombre de usuario *</Label>
+              <Input 
+                id="username" 
+                value={formData.username} 
+                onChange={handleChange} 
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input 
+                id="password" 
+                type="password" 
+                value={formData.password} 
+                onChange={handleChange} 
+              />
               <p className="text-xs text-muted-foreground">La contraseña se almacenará de forma encriptada</p>
+            </div>
+
+            <div className="pt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={testConnection}
+                disabled={testing || !formData.ipAddress}
+              >
+                {testing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  "Probar conexión"
+                )}
+              </Button>
+              
+              {testResult === "success" && (
+                <span className="ml-3 text-green-600 text-sm">✓ Conexión exitosa</span>
+              )}
+              {testResult === "error" && (
+                <span className="ml-3 text-red-600 text-sm">✗ Error de conexión</span>
+              )}
             </div>
 
             {error && (
@@ -155,13 +245,8 @@ export default function DvrPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {success && (
-              <Alert className="bg-green-50 text-green-800 border-green-200">
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -171,6 +256,15 @@ export default function DvrPage() {
                   Guardar Configuración
                 </>
               )}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="secondary" 
+              className="w-full" 
+              onClick={() => router.push("/dashboard/dvr/manage")}
+            >
+              Ver DVRs existentes
             </Button>
           </CardFooter>
         </form>

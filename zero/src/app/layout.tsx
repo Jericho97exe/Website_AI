@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { NotificationProvider } from "@/components/notification-provider"
+import SocketConnectionManager from "@/components/SocketConnectionManager";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -23,8 +24,10 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+
+          
           <AuthProvider>
-            <NotificationProvider>{children}</NotificationProvider>
+            <NotificationProvider><SocketConnectionManager />{children}</NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

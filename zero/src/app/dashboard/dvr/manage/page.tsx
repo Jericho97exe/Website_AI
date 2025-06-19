@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import LiveStream from "@/components/LiveStream"
 
 type DvrConnection = {
   id: string
@@ -33,23 +34,31 @@ export default function ManageDvrPage() {
   const [selectedDvr, setSelectedDvr] = useState<DvrConnection | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [cameraFeeds, setCameraFeeds] = useState<string[]>([])
+  const [cameraFeeds, setCameraFeeds] = useState<number[]>([])
+  const [streamLoading, setStreamLoading] = useState(true)
 
+  // Cargar conexiones desde localStorage
   useEffect(() => {
-    // Load DVR connections from localStorage
     const storedConnections = localStorage.getItem("dvrConnections")
     if (storedConnections) {
-      setDvrConnections(JSON.parse(storedConnections))
+      try {
+        setDvrConnections(JSON.parse(storedConnections))
+      } catch (error) {
+        console.error("Error parsing DVR connections:", error)
+        addNotification("Error de datos", "Error al cargar configuraciones de DVR", "error")
+      }
     }
     setLoading(false)
-  }, [])
+  }, [addNotification])
 
+  // Manejar eliminación de DVR
   const handleDelete = (dvr: DvrConnection) => {
     setSelectedDvr(dvr)
     setIsDeleteDialogOpen(true)
   }
 
-  const confirmDelete = () => {
+  // Confirmar eliminación
+  const confirmDelete = useCallback(() => {
     if (!selectedDvr) return
 
     try {
@@ -58,30 +67,27 @@ export default function ManageDvrPage() {
       setDvrConnections(updatedConnections)
 
       addNotification("DVR eliminado", `La configuración del DVR "${selectedDvr.name}" ha sido eliminada`, "warning")
-
-      setIsDeleteDialogOpen(false)
-      setSelectedDvr(null)
     } catch (error) {
       addNotification("Error al eliminar", "No se pudo eliminar la configuración del DVR", "error")
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setSelectedDvr(null)
     }
-  }
+  }, [dvrConnections, selectedDvr, addNotification])
 
+  // Ver contenido del DVR
   const handleViewContent = (dvr: DvrConnection) => {
     setSelectedDvr(dvr)
-
-    // Simulate loading camera feeds
-    setCameraFeeds([])
+    setStreamLoading(true)
     setIsViewDialogOpen(true)
-
-    // Simulate API call to get camera feeds
-    setTimeout(() => {
-      // Generate random number of cameras (3-8)
-      const numCameras = Math.floor(Math.random() * 6) + 3
-      const feeds = Array.from({ length: numCameras }, (_, i) => `Cámara ${i + 1}`)
-      setCameraFeeds(feeds)
-    }, 1500)
+    
+    // Generar feeds de cámara (1-8 para DVR de 8 canales)
+    const feeds = Array.from({ length: 8 }, (_, i) => i + 1)
+    setCameraFeeds(feeds)
+    setStreamLoading(false)
   }
 
+  // Formatear fecha
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString()
   }
@@ -160,7 +166,7 @@ export default function ManageDvrPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Diálogo de confirmación de eliminación */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -181,9 +187,9 @@ export default function ManageDvrPage() {
         </DialogContent>
       </Dialog>
 
-      {/* View Content Dialog */}
+      {/* Diálogo de visualización de contenido */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Contenido del DVR: {selectedDvr?.name}</DialogTitle>
             <DialogDescription>
@@ -192,24 +198,25 @@ export default function ManageDvrPage() {
           </DialogHeader>
 
           <div className="py-4">
-            {cameraFeeds.length === 0 ? (
+            {streamLoading ? (
               <div className="flex h-64 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin mr-2" />
                 <span>Conectando con el DVR...</span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {cameraFeeds.map((camera, index) => (
-                  <div
-                    key={index}
-                    className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-md flex items-center justify-center relative overflow-hidden"
-                  >
-                    <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 text-xs rounded">
-                      {camera}
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground">Vista previa de cámara</p>
-                      <p className="text-xs text-muted-foreground">(Simulación)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {cameraFeeds.map((cameraId) => (
+                  <div key={cameraId} className="bg-gray-100 rounded-lg p-3">
+                    <h3 className="font-medium mb-2">Cámara {cameraId}</h3>
+                    <div className="aspect-video bg-gray-800 rounded-md overflow-hidden">
+                      {selectedDvr && (
+                        <LiveStream 
+                          dvrIp={selectedDvr.ipAddress}
+                          dvrUser={selectedDvr.username}
+                          dvrPass={selectedDvr.password}
+                          channel={cameraId}
+                        />
+                      )}
                     </div>
                   </div>
                 ))}
